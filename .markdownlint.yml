@@ -1,0 +1,35 @@
+default: true
+ul-indent:
+  indent: 4
+  start_indented: false
+ul-style:
+  style: consistent
+line-length:
+  line_length: 400
+  tables: false
+no-inline-html:
+  allowed_elements:
+    - br
+    - kbd
+    - sub
+    - sup
+    - internal
+    - img
+    - div
+    - td
+code-block-style: false
+no-alt-text: false
+## Allow same headings if they are in different chapters. https://github.com/DavidAnson/markdownlint/blob/main/doc/md024.md
+no-duplicate-header:
+  allow_different_nesting: true
+  siblings_only: true
+# MD051/link-fragments - Link fragments should be valid
+md051: false
+# MD013 line length
+md013: false
+# MD033 inline HTML
+md033: false
+# MD036 no emphasize as heading
+md036: false
+# table count => we are using colspan
+md056: false

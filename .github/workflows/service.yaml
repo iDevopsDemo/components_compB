@@ -1,0 +1,33 @@
+name: Service
+
+on:
+  workflow_call:
+    inputs:
+      fail-test:
+        required: true
+        type: string
+
+jobs:
+  service-test:
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        echo "The value of fail-test is: ${{ inputs.fail-test }}"
+        if [ "${{ inputs.fail-test }}" == "true" ]; then
+          echo "Failing the job as requested."
+          exit 1
+        else
+          echo "Continuing the job."
+        fi
+
+  service-test-nfr:
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        echo "The value of fail-test is: ${{ inputs.fail-test }}"
+        if [ "${{ inputs.fail-test }}" == "true" ]; then
+          echo "Failing the job as requested."
+          exit 1
+        else
+          echo "Continuing the job."
+        fi

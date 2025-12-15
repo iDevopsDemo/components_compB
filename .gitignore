@@ -1,0 +1,14 @@
+*.pyc
+*egg-info
+*.log
+.tox
+.coverage
+.cache
+.pyenv
+Thumbs.db
+build
+docs/api
+*.db
+/MANIFEST
+.vscode/*
+app.db
