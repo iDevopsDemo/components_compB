@@ -1,4 +1,4 @@
-FROM python:3.8-alpine@sha256:3d93b1f77efce339aa77db726656872517b0d67837989aa7c4b35bd5ae7e81ba
+FROM docker.artifactory.mydevops.info/python:3.8-alpine
 
 LABEL maintainer="lars.gelbke@siemens.com"
 
@@ -10,6 +10,6 @@ COPY ./requirements.txt requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ./dataprovider /dataprovider/
+COPY ./datacollector /datacollector/
 
-CMD [ "python", "-m", "dataprovider.core" ]
+CMD [ "python", "-m", "datacollector.core" ]
