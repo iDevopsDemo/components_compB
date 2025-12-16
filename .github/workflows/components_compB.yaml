@@ -4,7 +4,7 @@ on: push
 
 env:
   COMP_NAME: comp-b
-  SCA_SOURCES: "./dataprovider"
+  SCA_SOURCES: "./datacollector"
 
 jobs:
   pre-commit:
