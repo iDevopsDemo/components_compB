@@ -212,7 +212,7 @@ jobs:
 
   call-integration-compA:
     needs: [call-service]
-    uses: iDevopsDemo/components_compA@integration-scenarios/.github/workflows/integration.yaml
+    uses: iDevopsDemo/components_compA/.github/workflows/integration.yaml@integration-scenarios
     with:
       fail-test: "false"
 
