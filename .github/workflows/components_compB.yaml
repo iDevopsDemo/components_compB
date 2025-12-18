@@ -210,6 +210,12 @@ jobs:
     with:
       fail-test: "false"
 
+  call-integration-compA:
+    needs: [call-service]
+    uses: iDevopsDemo/components_compA@ci/github/.github/workflows/integration.yaml
+    with:
+      fail-test: "false"
+
   release:
     needs: [call-integration]
     runs-on: ubuntu-latest

@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - run: |
+        echo "Starting integration tests for ${{ env.COMP_NAME }}"
         echo "The value of fail-test is: ${{ inputs.fail-test }}"
         if [ "${{ inputs.fail-test }}" == "true" ]; then
           echo "Failing the job as requested."
