@@ -10,11 +10,9 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v3
-    - uses: pre-commit/action@v3.0.1
+    - uses: iDevopsDemo/environment_cicd/.github/pre-commit@main
 
-  scan:
+  gitleaks:
     name: gitleaks
     runs-on: ubuntu-latest
     steps:
@@ -26,35 +24,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
-  pylint:
+  python-lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v3
-    - run: pip install --no-cache-dir pylint pylint-gitlab
-    - run: mkdir ./sca
-    - name: Run pylint
-      run: |
-        pylint --exit-zero --score=y --reports=y --output-format=text \
-            ${SCA_SOURCES} | tee ./sca/pylint-report.txt
-        sed -n 's/^Your code has been rated at \([-0-9.]*\)\/.*/\1/p' \
-            ./sca/pylint-report.txt > ./sca/pylint-score.txt
-        pylint --exit-zero --output-format=parseable \
-            ${SCA_SOURCES} | tee ./sca/pylint-parseable.txt
-        pylint --exit-zero --load-plugins=pylint_gitlab --output-format=gitlab-codeclimate \
-            ${SCA_SOURCES} > ./sca/codequality-report.json
-    - name: Generate pylint badge
-      run: |
-        pip install anybadge
-        anybadge --overwrite --label pylint \
-            --value=$(cat ./sca/pylint-score.txt) \
-            --file=./sca/pylint-score.svg \
-            4=red 6=orange 8=yellow 10=green
-    - name: Upload pylint reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: pylint-reports
-        path: ./sca
+      - uses: iDevopsDemo/environment_cicd/.github/python-lint@main
+        with:
+          SCA_SOURCES: "${{ env.SCA_SOURCES }}"
 
   hadolint:
     runs-on: ubuntu-latest
@@ -69,30 +44,13 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.11']
-
     steps:
-    - uses: actions/checkout@v5
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install tox tox-gh-actions
-    - name: Test with tox
-      run: tox -e coverage -- --junitxml=pytest-junit.xml
-    - name: Upload unit test reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: unit-test-reports
-        path: |
-          pytest-junit.xml
-          .coverage
-          coverage.xml
-          htmlcov/
+      - uses: iDevopsDemo/environment_cicd/.github/python-unit-tests@main
+        with:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+          SCA_SOURCES: "${{ env.SCA_SOURCES }}"
 
-  build:
+  docker-build:
     runs-on: ubuntu-latest
     needs: hadolint
     permissions:
@@ -100,106 +58,22 @@ jobs:
     outputs:
       build-version: ${{ steps.version.outputs.version }}
     steps:
-      - id: repo-name-lowercase
-        name: Convert repository owner to lowercase
-        uses: ASzc/change-string-case-action@v2
+      - uses: iDevopsDemo/environment_cicd/.github/docker-build@main
         with:
-          string: "${{ github.repository_owner }}"
+          COMP_NAME: "${{ env.COMP_NAME }}"
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
-      - uses: actions/checkout@v5
-
-      - name: Git Version
-        id: version
-        uses: codacy/git-version@2.8.6
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      -
-        name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          push: true
-          tags: "ghcr.io/${{ steps.repo-name-lowercase.outputs.lowercase }}/${{ env.COMP_NAME }}:${{ steps.version.outputs.version }}"
-
-  lint-test:
+  helm-test:
     runs-on: ubuntu-latest
     permissions:
       packages: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5.0.0
+      - uses: iDevopsDemo/environment_cicd/.github/helm-test@main
         with:
-          fetch-depth: 0
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4.3.1
-
-      - uses: actions/setup-python@v6.0.0
-        with:
-          python-version: '3.x'
-          check-latest: true
-
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62 # v47
-
-      - name: List all changed files
-        env:
-          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
-        run: |
-          for file in ${ALL_CHANGED_FILES}; do
-            echo "$file was changed"
-          done
-
-      - name: Set up chart-testing
-        uses: helm/chart-testing-action@v2.8.0
-
-      - name: Run chart-testing (list-changed)
-        id: list-changed
-        run: |
-          changed=$(ct list-changed --target-branch ${{ github.event.repository.default_branch }})
-          if [[ -n "$changed" ]]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Run chart-testing (lint)
-        if: steps.list-changed.outputs.changed == 'true'
-        run: ct lint --target-branch ${{ github.event.repository.default_branch }} --config ct.yaml
-
-      - name: Create kind cluster
-        if: steps.list-changed.outputs.changed == 'true'
-        uses: helm/kind-action@v1.12.0
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Load images into kind
-        if: steps.list-changed.outputs.changed == 'true'
-        run: |
-          for chart in $(ct list-changed --target-branch ${{ github.event.repository.default_branch }}); do
-            image=$(yq e '.image.repository + ":" + .image.tag' "./${chart}/values.yaml")
-            docker pull "$image"
-            kubectl cluster-info --context kind-chart-testing
-            kind load docker-image "$image" --name chart-testing
-          done
-
-      - name: Run chart-testing (install)
-        if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --target-branch ${{ github.event.repository.default_branch }} --config ct.yaml
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
   call-service:
-    needs: [lint-test, build, unit-tests]
+    needs: [helm-test, docker-build, unit-tests]
     uses: ./.github/workflows/service.yaml
     with:
       fail-test: "false"
@@ -210,8 +84,14 @@ jobs:
     with:
       fail-test: "false"
 
+  call-integration-compA:
+    needs: [call-service]
+    uses: iDevopsDemo/components_compA/.github/workflows/integration.yaml@main
+    with:
+      fail-test: "false"
+
   release:
-    needs: [call-integration]
+    needs: [call-integration, pre-commit, python-lint, gitleaks]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -220,39 +100,13 @@ jobs:
       - name: Bump version and push tag
         uses: anothrNick/github-tag-action@v1
 
-
   promote:
-    needs: [release, build]
+    needs: [release, docker-build]
     runs-on: ubuntu-latest
     permissions:
       packages: read
     if: github.ref == 'refs/heads/main'
     steps:
-      - id: repo-name-lowercase
-        name: Convert repository owner to lowercase
-        uses: ASzc/change-string-case-action@v2
-        with:
-          string: "${{ github.repository_owner }}"
-
-      - uses: actions/checkout@v5
-
-      - name: Git Version
-        id: version
-        uses: codacy/git-version@2.8.6
-
-      - uses: imjasonh/setup-crane@v0.1
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: promote-image
-        run: |
-          CALCULATED_RELEASE_VERSION=$(get_release_version)
-          echo "CALCULATED_RELEASE_VERSION=${CALCULATED_RELEASE_VERSION}"
-          echo "Promoting image for ${{ env.COMP_NAME }}"
-          crane auth login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
-          crane tag ghcr.io/${{ steps.repo-name-lowercase.outputs.lowercase }}/${{ env.COMP_NAME }}:${{ needs.build.outputs.build-version }} ${{ steps.version.outputs.version }}
+        - uses: iDevopsDemo/environment_cicd/.github/promote@main
+          with:
+            COMP_NAME: "${{ env.COMP_NAME }}"
