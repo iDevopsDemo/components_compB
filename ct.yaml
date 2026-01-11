@@ -3,3 +3,5 @@ chart-dirs:
 validate-maintainers: false
 chart-yaml-schema: chart_schema.yaml
 lint-conf: lintconf.yaml
+#version will be set using gitversion during the build process
+check-version-increment: false
