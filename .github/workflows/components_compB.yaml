@@ -86,6 +86,7 @@ jobs:
     steps:
       - uses: iDevopsDemo/environment_cicd/.github/helm-test@main
         with:
+          CHART_DIR: "./charts/comp-b"
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
   helm-build:
