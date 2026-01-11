@@ -1,6 +1,18 @@
-name: components_compB CI
+name: CI for Component-B
 
-on: push
+on:
+  push:
+    branches:
+      - main
+      - 'bugfix/*'
+      - 'feature/*'
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+'
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    branches: [ main ]
+  workflow_dispatch:
 
 env:
   COMP_NAME: comp-b
@@ -44,6 +56,11 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.11']
+    permissions:
+      contents: read
+      issues: read
+      checks: write
+      pull-requests: write
     steps:
       - uses: iDevopsDemo/environment_cicd/.github/python-unit-tests@main
         with:
@@ -55,10 +72,9 @@ jobs:
     needs: hadolint
     permissions:
       packages: write
-    outputs:
-      build-version: ${{ steps.version.outputs.version }}
     steps:
       - uses: iDevopsDemo/environment_cicd/.github/docker-build@main
+        id: docker-build
         with:
           COMP_NAME: "${{ env.COMP_NAME }}"
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
@@ -72,8 +88,22 @@ jobs:
         with:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
+  helm-build:
+    runs-on: ubuntu-latest
+    needs: [helm-test, docker-build]
+    permissions:
+      packages: write
+    outputs:
+      chart-name: ${{ steps.helm-build.outputs.chart-name }}
+    steps:
+      - uses: iDevopsDemo/environment_cicd/.github/helm-build@main
+        id: helm-build
+        with:
+          CHART_DIR: "./charts/comp-a"
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
   call-service:
-    needs: [helm-test, docker-build, unit-tests]
+    needs: [helm-build, docker-build, unit-tests]
     uses: ./.github/workflows/service.yaml
     with:
       fail-test: "false"
@@ -84,29 +114,13 @@ jobs:
     with:
       fail-test: "false"
 
-  call-integration-compA:
-    needs: [call-service]
-    uses: iDevopsDemo/components_compA/.github/workflows/integration.yaml@main
-    with:
-      fail-test: "false"
-
-  release:
-    needs: [call-integration, pre-commit, python-lint, gitleaks]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Bump version and push tag
-        uses: anothrNick/github-tag-action@v1
-
   promote:
-    needs: [release, docker-build]
+    needs: [call-integration, helm-build]
     runs-on: ubuntu-latest
     permissions:
-      packages: read
-    if: github.ref == 'refs/heads/main'
+      packages: write
     steps:
-        - uses: iDevopsDemo/environment_cicd/.github/promote@main
+        - uses: iDevopsDemo/environment_cicd/.github/promote-new@main
           with:
-            COMP_NAME: "${{ env.COMP_NAME }}"
+            CHART_NAME: "${{ needs.helm-build.outputs.chart-name }}"
+            GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
