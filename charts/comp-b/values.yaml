@@ -18,7 +18,7 @@ env:
   DATACOLLECTOR_STORAGE: "mysql"
   QCLIENT_BROKER_HOST: "mosquitto"
   STORAGE_MYSQL_HOST: "mysql"
-  STORAGE_MYSQL_DB: "xo-sample"
+  STORAGE_MYSQL_DB: "mqtt-broker-app"
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
