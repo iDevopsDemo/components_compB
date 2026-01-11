@@ -99,7 +99,7 @@ jobs:
       - uses: iDevopsDemo/environment_cicd/.github/helm-build@main
         id: helm-build
         with:
-          CHART_DIR: "./charts/comp-a"
+          CHART_DIR: "./charts/comp-b"
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
   call-service:
@@ -111,6 +111,12 @@ jobs:
   call-integration:
     needs: [call-service]
     uses: ./.github/workflows/integration.yaml
+    with:
+      fail-test: "false"
+
+  call-integration-compA:
+    needs: [call-service]
+    uses: iDevopsDemo/components_compA/.github/workflows/integration.yaml@main
     with:
       fail-test: "false"
 
